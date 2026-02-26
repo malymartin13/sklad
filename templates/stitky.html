@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: sans-serif; }
+        .stitek {
+            width: 40%;
+            border: 1px solid #000;
+            padding: 15px;
+            margin: 10px;
+            display: inline-block;
+            text-align: center;
+            vertical-align: top;
+        }
+        .qr-img { width: 150px; height: 150px; }
+        .nazev { font-weight: bold; font-size: 1.2em; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">Štítky skladu k vytištění</h1>
+    {% for vec in veci %}
+    <div class="stitek">
+        <div class="nazev">{{ vec.nazev }}</div>
+        <div class="info">ID: {{ vec.id }} | Domov: {{ vec.domov }}</div>
+        <img class="qr-img" src="data:image/png;base64,{{ vec.qr }}">
+    </div>
+    {% endfor %}
+</body>
+</html>

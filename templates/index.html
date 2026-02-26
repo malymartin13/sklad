@@ -1,0 +1,47 @@
+<body>
+    <h1>📦 Skladová kniha výpůjček</h1>
+<a href="/tisk" target="_blank" style="display:inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-bottom: 20px; font-weight: bold;">
+    🖨️ Generovat PDF se štítky
+</a>
+    
+    <div class="form-box">
+        <h3>➕ Přidat novou věc do systému</h3>
+        <form action="/pridat" method="post">
+            <input type="text" name="nazev" placeholder="Název věci" required>
+            <input type="text" name="domov" placeholder="Domovský regál" required>
+            <button type="submit" style="background: #28a745; color: white; border: none; padding: 5px 15px; cursor: pointer;">Uložit</button>
+        </form>
+    </div>
+
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Věc</th>
+            <th>Domov (Kde má být)</th>
+            <th>Aktuální poloha</th>
+            <th>Kdo ji má</th>
+            <th>Akce</th>
+        </tr>
+        {% for vec in veci %}
+        <tr style="background: {{ 'white' if vec.drzitel == 'Ve skladu' else '#fff3cd' }};">
+            <td>{{ vec.id }}</td>
+            <td><strong>{{ vec.nazev }}</strong></td>
+            <td>{{ vec.domov }}</td>
+            <td>{{ vec.poloha }}</td>
+            <td>
+                <span style="color: {{ 'green' if vec.drzitel == 'Ve skladu' else 'red' }}; font-weight: bold;">
+                    {{ vec.drzitel }}
+                </span>
+            </td>
+            <td>
+                <form action="/akce/{{ vec.id }}" method="post" style="display:flex; gap: 5px;">
+                    <input type="text" name="drzitel" placeholder="Jméno..." style="width: 100px;">
+                    <button type="submit" style="cursor: pointer;">
+                        {{ 'Půjčit' if vec.drzitel == 'Ve skladu' else 'Vrátit / Změnit' }}
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
