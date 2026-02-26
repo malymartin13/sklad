@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Historie skladu</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #343a40; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .back { margin-bottom: 20px; display: block; }
+    </style>
+</head>
+<body>
+    <a href="/" class="back">← Zpět do skladu</a>
+    <h1>📜 Kompletní historie pohybů</h1>
+    <table>
+        <tr>
+            <th>Čas záznamu</th>
+            <th>Akce / Věc</th>
+            <th>Pracovník (Půjčil si)</th>
+            <th>Vydal (Skladník)</th>
+            <th>Poznámka ke stavu</th>
+        </tr>
+        {% for r in zaznamy %}
+        <tr>
+            <td>{{ r.cas }}</td>
+            <td>{{ r.akce }}</td>
+            <td>{{ r.osoba }}</td>
+            <td>{{ r.vydal or '-' }}</td>
+            <td>{{ r.poznamka or '' }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
