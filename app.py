@@ -6,6 +6,7 @@ import base64
 from weasyprint import HTML
 
 app = Flask(__name__)
+init_db()  # Spustí vytvoření tabulek hned při načtení aplikace serverem
 
 def get_db_connection():
     conn = sqlite3.connect('sklad.db')
@@ -84,5 +85,6 @@ def tisk():
     }
 
 if __name__ == '__main__':
-    init_db()
+    init_db()  # Tímto zajistíme, že se tabulka vytvoří při spuštění u tebe doma
+
     app.run(debug=True)
