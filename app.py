@@ -15,25 +15,25 @@ def get_db_connection():
 
 def init_db():
     conn = get_db_connection()
-    # Tabulka věcí s novými sloupci
+    # Vytvoření tabulek (pokud neexistují)
     conn.execute('''CREATE TABLE IF NOT EXISTS veci 
                     (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                      nazev TEXT, domov TEXT, poloha TEXT, drzitel TEXT,
                      datum_posledni TEXT, poznamka TEXT, vydal TEXT)''')
     
-    # Tabulka historie s novými sloupci
     conn.execute('''CREATE TABLE IF NOT EXISTS historie 
                     (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                      vec_id INTEGER, akce TEXT, osoba TEXT, 
                      vydal TEXT, poznamka TEXT,
                      cas TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Automatické přidání sloupců, pokud by tabulka už existovala ze starší verze
-    sloupce = [('datum_posledni', 'TEXT'), ('poznamka', 'TEXT'), ('vydal', 'TEXT')]
-    for nazev_sloupce, typ in sloupce:
-        try: conn.execute(f'ALTER TABLE veci ADD COLUMN {nazev_sloupce} {typ}')
-        except: pass
-    
+    # Pojistka pro starší verze databáze na Renderu
+    try: conn.execute('ALTER TABLE veci ADD COLUMN datum_posledni TEXT')
+    except: pass
+    try: conn.execute('ALTER TABLE veci ADD COLUMN poznamka TEXT')
+    except: pass
+    try: conn.execute('ALTER TABLE veci ADD COLUMN vydal TEXT')
+    except: pass
     conn.close()
 
 init_db()
@@ -56,6 +56,7 @@ def pridat():
     conn.close()
     return redirect('/')
 
+# CESTA PRO PŮJČENÍ (Tlačítko OK)
 @app.route('/akce/<int:id>', methods=('POST',))
 def akce(id):
     drzitel = request.form.get('drzitel')
@@ -63,25 +64,39 @@ def akce(id):
     poznamka = request.form.get('poznamka')
     nyni = datetime.now().strftime("%d.%m.%Y %H:%M")
     
+    if not drzitel: return redirect('/') # Pokud není vyplněn držitel, nic nedělej
+
     conn = get_db_connection()
     vec = conn.execute('SELECT nazev FROM veci WHERE id = ?', (id,)).fetchone()
     
-    if drzitel and drzitel.strip(): 
-        # PŮJČENÍ
-        conn.execute('''UPDATE veci SET drzitel = ?, poloha = ?, 
-                        datum_posledni = ?, poznamka = ?, vydal = ? WHERE id = ?''',
-                     (drzitel, 'U pracovníka', nyni, poznamka, vydal, id))
-        conn.execute('''INSERT INTO historie (vec_id, akce, osoba, vydal, poznamka) 
-                        VALUES (?, ?, ?, ?, ?)''',
-                     (id, f"Půjčeno: {vec['nazev']}", drzitel, vydal, poznamka))
-    else:
-        # VRÁCENÍ
-        conn.execute('''UPDATE veci SET drzitel = ?, poloha = domov, 
-                        poznamka = ?, vydal = "" WHERE id = ?''',
-                     ('Ve skladu', poznamka, id))
+    conn.execute('''UPDATE veci SET drzitel = ?, poloha = ?, 
+                    datum_posledni = ?, poznamka = ?, vydal = ? WHERE id = ?''',
+                 (drzitel, 'U pracovníka', nyni, poznamka, vydal, id))
+    
+    conn.execute('''INSERT INTO historie (vec_id, akce, osoba, vydal, poznamka) 
+                    VALUES (?, ?, ?, ?, ?)''',
+                 (id, f"Půjčeno: {vec['nazev']}", drzitel, vydal, poznamka))
+    
+    conn.commit()
+    conn.close()
+    return redirect('/')
+
+# NOVÁ CESTA PRO VRÁCENÍ (Tlačítko VRÁTIT)
+@app.route('/vratit/<int:id>')
+def vratit(id):
+    conn = get_db_connection()
+    vec = conn.execute('SELECT nazev, drzitel FROM veci WHERE id = ?', (id,)).fetchone()
+    
+    if vec:
+        # Zápis do historie
         conn.execute('''INSERT INTO historie (vec_id, akce, osoba, poznamka) 
                         VALUES (?, ?, ?, ?)''',
-                     (id, f"Vráceno: {vec['nazev']}", "Sklad", poznamka))
+                     (id, f"Vráceno: {vec['nazev']}", f"od {vec['drzitel']}", "Vráceno do skladu"))
+        
+        # Update stavu věci
+        conn.execute('''UPDATE veci SET drzitel = 'Ve skladu', poloha = domov, 
+                        vydal = '', datum_posledni = ? WHERE id = ?''',
+                     (datetime.now().strftime("%d.%m.%Y %H:%M"), id))
         
     conn.commit()
     conn.close()
@@ -90,12 +105,13 @@ def akce(id):
 @app.route('/historie')
 def zobraz_historii():
     conn = get_db_connection()
-    zaznamy = conn.execute('SELECT * FROM historie ORDER BY cas DESC LIMIT 100').fetchall()
+    zaznamy = conn.execute('SELECT * FROM historie ORDER BY id DESC LIMIT 100').fetchall()
     conn.close()
     return render_template('historie.html', zaznamy=zaznamy)
 
 @app.route('/tisk')
 def tisk():
+    # ... (tato část zůstává stejná jako v minulém kódu) ...
     conn = get_db_connection()
     veci = conn.execute('SELECT * FROM veci').fetchall()
     conn.close()
