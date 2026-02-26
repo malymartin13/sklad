@@ -2,61 +2,118 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Chytrý Sklad</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chytrý Sklad 📦</title>
     <style>
-        body { font-family: sans-serif; margin: 20px; background: #f4f4f4; }
-        .karta { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #007bff; color: white; }
-        .vypujcka-form { display: flex; gap: 5px; }
-        input { padding: 5px; border: 1px solid #ddd; border-radius: 4px; }
+        :root {
+            --primary: #007bff;
+            --success: #28a745;
+            --danger: #dc3545;
+            --bg: #f8f9fa;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: var(--bg); color: #333; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        
+        h1 { color: #222; margin-top: 0; display: flex; align-items: center; gap: 10px; }
+        
+        .nav-links { margin-bottom: 25px; display: flex; gap: 10px; }
+        .btn { padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: 600; cursor: pointer; border: none; font-size: 14px; transition: 0.2s; }
+        .btn-print { background-color: var(--success); color: white; }
+        .btn-history { background-color: var(--primary); color: white; }
+        .btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
+        .form-add { background: #eee; padding: 20px; border-radius: 8px; margin-bottom: 30px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
+        .form-add h3 { grid-column: 1 / -1; margin: 0 0 10px 0; font-size: 16px; }
+        input { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background-color: #f2f2f2; text-align: left; padding: 15px; border-bottom: 2px solid #ddd; color: #555; }
+        td { padding: 15px; border-bottom: 1px solid #eee; vertical-align: middle; }
+        
+        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .status-in { background: #d4edda; color: #155724; }
+        .status-out { background: #fff3cd; color: #856404; }
+
+        .action-cell { min-width: 280px; }
+        .action-form { display: flex; gap: 5px; }
+        .btn-action { background: var(--success); color: white; padding: 6px 12px; border-radius: 4px; border: none; font-size: 12px; }
+        .btn-return { background: var(--danger); color: white; padding: 8px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-block; }
+        
+        .info-small { font-size: 12px; color: #777; display: block; margin-top: 4px; }
     </style>
 </head>
 <body>
-    <div class="karta">
-        <h1>📦 Správa skladu</h1>
-        <a href="/tisk" target="_blank" style="padding: 10px; background: #28a745; color: white; text-decoration: none; border-radius: 5px;">🖨️ Tisk štítků (PDF)</a>
-        <a href="/historie" style="margin-left: 15px; text-decoration: none; color: #007bff;">📜 Historie pohybů</a>
 
-        <h3>➕ Přidat novou věc</h3>
-        <form action="/pridat" method="POST">
-            <input type="text" name="nazev" placeholder="Název věci (např. Vrtačka)" required>
-            <input type="text" name="domov" placeholder="Stálé místo (např. Regál A1)" required>
-            <button type="submit">Přidat do skladu</button>
-        </form>
+<div class="container">
+    <h1>📦 Správa skladu</h1>
 
-        <table>
+    <div class="nav-links">
+        <a href="/tisk" target="_blank" class="btn btn-print">🖨️ Tisk štítků (PDF)</a>
+        <a href="/historie" class="btn btn-history">📜 Historie pohybů</a>
+    </div>
+
+    <form action="/pridat" method="POST" class="form-add">
+        <h3>➕ Nový předmět do evidence</h3>
+        <div>
+            <label class="info-small">Název věci</label>
+            <input type="text" name="nazev" placeholder="např. Úhlová bruska" required style="width: 100%;">
+        </div>
+        <div>
+            <label class="info-small">Stálé umístění</label>
+            <input type="text" name="domov" placeholder="např. Regál B5" required style="width: 100%;">
+        </div>
+        <button type="submit" class="btn btn-history">Uložit</button>
+    </form>
+
+    <table>
+        <thead>
             <tr>
-                <th>ID</th>
-                <th>Věc</th>
-                <th>Původní místo</th>
-                <th>Aktuální stav / Držitel</th>
-                <th>Datum výpůjčky</th>
-                <th>Vydal</th>
+                <th>Předmět a poloha</th>
+                <th>Stav / U koho je</th>
+                <th>Poslední změna</th>
                 <th>Poznámka</th>
                 <th>Akce</th>
             </tr>
+        </thead>
+        <tbody>
             {% for v in veci %}
             <tr>
-                <td>{{ v.id }}</td>
-                <td><strong>{{ v.nazev }}</strong></td>
-                <td>{{ v.domov }}</td>
-                <td>{{ v.drzitel }}</td>
-                <td>{{ v.datum_posledni or '-' }}</td>
-                <td>{{ v.vydal or '-' }}</td>
-                <td><small>{{ v.poznamka or '' }}</small></td>
                 <td>
-                    <form action="/akce/{{ v.id }}" method="POST" class="vypujcka-form">
-                        <input type="text" name="drzitel" placeholder="Pracovník" value="{{ v.drzitel if v.drzitel != 'Ve skladu' else '' }}">
-                        <input type="text" name="vydal" placeholder="Skladník">
-                        <input type="text" name="poznamka" placeholder="Stav věci">
-                        <button type="submit">OK</button>
-                    </form>
+                    <strong>{{ v.nazev }}</strong>
+                    <span class="info-small">Domov: {{ v.domov }}</span>
+                </td>
+                <td>
+                    {% if v.drzitel == 'Ve skladu' %}
+                        <span class="status-badge status-in">VE SKLADU</span>
+                    {% else %}
+                        <span class="status-badge status-out">PŮJČENO</span>
+                        <span class="info-small">Držitel: {{ v.drzitel }}</span>
+                        <span class="info-small">Vydal: {{ v.vydal or '?' }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="info-small">{{ v.datum_posledni or 'Není záznam' }}</span>
+                </td>
+                <td>
+                    <span class="info-small">{{ v.poznamka or '-' }}</span>
+                </td>
+                <td class="action-cell">
+                    {% if v.drzitel == 'Ve skladu' %}
+                        <form action="/akce/{{ v.id }}" method="POST" class="action-form">
+                            <input type="text" name="drzitel" placeholder="Pracovník" required style="width: 80px;">
+                            <input type="text" name="vydal" placeholder="Skladník" style="width: 80px;">
+                            <input type="text" name="poznamka" placeholder="Poznámka" style="width: 80px;">
+                            <button type="submit" class="btn-action">Půjčit</button>
+                        </form>
+                    {% else %}
+                        <a href="/vratit/{{ v.id }}" class="btn-return" onclick="return confirm('Opravdu vráceno do skladu?')">📥 Vrátit do skladu</a>
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
-        </table>
-    </div>
+        </tbody>
+    </table>
+</div>
+
 </body>
 </html>
