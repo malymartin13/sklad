@@ -4,29 +4,39 @@ import qrcode
 import io
 import base64
 from weasyprint import HTML
+from datetime import datetime
 
 app = Flask(__name__)
 
-# --- 1. DATABÁZOVÉ FUNKCE ---
-
 def get_db_connection():
-    # Na Renderu se soubor vytvoří v aktuální složce
     conn = sqlite3.connect('sklad.db')
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
     conn = get_db_connection()
+    # Tabulka věcí s novými sloupci
     conn.execute('''CREATE TABLE IF NOT EXISTS veci 
                     (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                     nazev TEXT, domov TEXT, poloha TEXT, drzitel TEXT)''')
+                     nazev TEXT, domov TEXT, poloha TEXT, drzitel TEXT,
+                     datum_posledni TEXT, poznamka TEXT, vydal TEXT)''')
+    
+    # Tabulka historie s novými sloupci
+    conn.execute('''CREATE TABLE IF NOT EXISTS historie 
+                    (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                     vec_id INTEGER, akce TEXT, osoba TEXT, 
+                     vydal TEXT, poznamka TEXT,
+                     cas TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # Automatické přidání sloupců, pokud by tabulka už existovala ze starší verze
+    sloupce = [('datum_posledni', 'TEXT'), ('poznamka', 'TEXT'), ('vydal', 'TEXT')]
+    for nazev_sloupce, typ in sloupce:
+        try: conn.execute(f'ALTER TABLE veci ADD COLUMN {nazev_sloupce} {typ}')
+        except: pass
+    
     conn.close()
 
-# Spustíme inicializaci databáze hned při startu aplikace
-# Teď už je to pod definicí funkce, takže to nevyhodí chybu
 init_db()
-
-# --- 2. WEBOVÉ CESTY (ROUTES) ---
 
 @app.route('/')
 def index():
@@ -49,55 +59,57 @@ def pridat():
 @app.route('/akce/<int:id>', methods=('POST',))
 def akce(id):
     drzitel = request.form.get('drzitel')
+    vydal = request.form.get('vydal')
+    poznamka = request.form.get('poznamka')
+    nyni = datetime.now().strftime("%d.%m.%Y %H:%M")
+    
     conn = get_db_connection()
+    vec = conn.execute('SELECT nazev FROM veci WHERE id = ?', (id,)).fetchone()
+    
     if drzitel and drzitel.strip(): 
-        conn.execute('UPDATE veci SET drzitel = ?, poloha = ? WHERE id = ?',
-                     (drzitel, 'U pracovníka', id))
+        # PŮJČENÍ
+        conn.execute('''UPDATE veci SET drzitel = ?, poloha = ?, 
+                        datum_posledni = ?, poznamka = ?, vydal = ? WHERE id = ?''',
+                     (drzitel, 'U pracovníka', nyni, poznamka, vydal, id))
+        conn.execute('''INSERT INTO historie (vec_id, akce, osoba, vydal, poznamka) 
+                        VALUES (?, ?, ?, ?, ?)''',
+                     (id, f"Půjčeno: {vec['nazev']}", drzitel, vydal, poznamka))
     else:
-        conn.execute('UPDATE veci SET drzitel = ?, poloha = domov WHERE id = ?',
-                     ('Ve skladu', id))
+        # VRÁCENÍ
+        conn.execute('''UPDATE veci SET drzitel = ?, poloha = domov, 
+                        poznamka = ?, vydal = "" WHERE id = ?''',
+                     ('Ve skladu', poznamka, id))
+        conn.execute('''INSERT INTO historie (vec_id, akce, osoba, poznamka) 
+                        VALUES (?, ?, ?, ?)''',
+                     (id, f"Vráceno: {vec['nazev']}", "Sklad", poznamka))
+        
     conn.commit()
     conn.close()
     return redirect('/')
 
-# Speciální cesta pro mobilní telefon po naskenování QR kódu
-@app.route('/akce_mobil/<int:id>')
-def akce_mobil(id):
-    # Pro jednoduchost to zatím jen přesměruje na hlavní stránku, 
-    # ale v budoucnu sem můžeme dát speciální formulář pro skladníka
-    return redirect('/')
+@app.route('/historie')
+def zobraz_historii():
+    conn = get_db_connection()
+    zaznamy = conn.execute('SELECT * FROM historie ORDER BY cas DESC LIMIT 100').fetchall()
+    conn.close()
+    return render_template('historie.html', zaznamy=zaznamy)
 
 @app.route('/tisk')
 def tisk():
     conn = get_db_connection()
     veci = conn.execute('SELECT * FROM veci').fetchall()
     conn.close()
-
     veci_s_qr = []
     for vec in veci:
-        # TVOJE ADRESA NA RENDREU:
-        # Tady vložíme odkaz, který mobil po naskenování otevře
         qr_data = f"https://sklad-l0i3.onrender.com/akce_mobil/{vec['id']}"
-        
         qr = qrcode.make(qr_data)
         img_buffer = io.BytesIO()
         qr.save(img_buffer, format='PNG')
         img_str = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
-        
-        veci_s_qr.append({
-            'nazev': vec['nazev'],
-            'id': vec['id'],
-            'domov': vec['domov'],
-            'qr': img_str
-        })
-
+        veci_s_qr.append({'nazev': vec['nazev'], 'id': vec['id'], 'domov': vec['domov'], 'qr': img_str})
     html_content = render_template('stitky.html', veci=veci_s_qr)
     pdf = HTML(string=html_content).write_pdf()
-    
-    return pdf, 200, {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': 'inline; filename=stitky.pdf'
-    }
+    return pdf, 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename=stitky.pdf'}
 
 if __name__ == '__main__':
     app.run(debug=True)
