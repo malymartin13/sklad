@@ -6,9 +6,11 @@ import base64
 from weasyprint import HTML
 
 app = Flask(__name__)
-init_db()  # Spustí vytvoření tabulek hned při načtení aplikace serverem
+
+# --- 1. DATABÁZOVÉ FUNKCE ---
 
 def get_db_connection():
+    # Na Renderu se soubor vytvoří v aktuální složce
     conn = sqlite3.connect('sklad.db')
     conn.row_factory = sqlite3.Row
     return conn
@@ -19,6 +21,12 @@ def init_db():
                     (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                      nazev TEXT, domov TEXT, poloha TEXT, drzitel TEXT)''')
     conn.close()
+
+# Spustíme inicializaci databáze hned při startu aplikace
+# Teď už je to pod definicí funkce, takže to nevyhodí chybu
+init_db()
+
+# --- 2. WEBOVÉ CESTY (ROUTES) ---
 
 @app.route('/')
 def index():
@@ -52,6 +60,13 @@ def akce(id):
     conn.close()
     return redirect('/')
 
+# Speciální cesta pro mobilní telefon po naskenování QR kódu
+@app.route('/akce_mobil/<int:id>')
+def akce_mobil(id):
+    # Pro jednoduchost to zatím jen přesměruje na hlavní stránku, 
+    # ale v budoucnu sem můžeme dát speciální formulář pro skladníka
+    return redirect('/')
+
 @app.route('/tisk')
 def tisk():
     conn = get_db_connection()
@@ -60,14 +75,14 @@ def tisk():
 
     veci_s_qr = []
     for vec in veci:
-        # Tady tvoříme QR kód, který obsahuje ID a název
-        qr_data = f"ID:{vec['id']} | {vec['nazev']}"
-        qr = qrcode.make(qr_data)
+        # TVOJE ADRESA NA RENDREU:
+        # Tady vložíme odkaz, který mobil po naskenování otevře
+        qr_data = f"https://sklad-l0i3.onrender.com/akce_mobil/{vec['id']}"
         
-        # Převedeme obrázek QR kódu do textového formátu pro HTML
+        qr = qrcode.make(qr_data)
         img_buffer = io.BytesIO()
         qr.save(img_buffer, format='PNG')
-        img_str = base64.b64encode(img_buffer.getvalue()).decode()
+        img_str = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
         
         veci_s_qr.append({
             'nazev': vec['nazev'],
@@ -85,6 +100,4 @@ def tisk():
     }
 
 if __name__ == '__main__':
-    init_db()  # Tímto zajistíme, že se tabulka vytvoří při spuštění u tebe doma
-
     app.run(debug=True)
