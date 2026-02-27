@@ -5,50 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chytrý Sklad 📦</title>
     <style>
-        :root {
-            --primary: #007bff;
-            --success: #28a745;
-            --danger: #dc3545;
-            --bg: #f8f9fa;
-            --dark: #343a40;
-        }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: var(--bg); color: #333; }
+        :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --bg: #f8f9fa; --dark: #343a40; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background-color: var(--bg); }
         .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        
         .header-area { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
-        h1 { margin: 0; font-size: 24px; }
-        
         .nav-links { display: flex; gap: 10px; align-items: center; }
-        .btn { padding: 10px 15px; border-radius: 6px; text-decoration: none; font-weight: 600; cursor: pointer; border: none; font-size: 13px; transition: 0.2s; display: inline-flex; align-items: center; gap: 5px; }
+        .btn { padding: 10px 15px; border-radius: 6px; text-decoration: none; font-weight: 600; cursor: pointer; border: none; font-size: 13px; transition: 0.2s; }
         .btn-print { background-color: var(--success); color: white; }
         .btn-history { background-color: var(--primary); color: white; }
         .btn-users { background-color: #6c757d; color: white; }
-        .btn-logout { background-color: transparent; color: var(--danger); border: 1px solid var(--danger); }
-        .btn:hover { opacity: 0.85; transform: translateY(-1px); }
-
-        .search-box { margin-bottom: 25px; }
-        #hledat { width: 100%; padding: 15px; font-size: 16px; border-radius: 8px; border: 2px solid #ddd; box-sizing: border-box; outline: none; transition: border-color 0.2s; }
-        #hledat:focus { border-color: var(--primary); }
-
+        .btn-logout { color: var(--danger); border: 1px solid var(--danger); }
+        #hledat { width: 100%; padding: 15px; font-size: 16px; border-radius: 8px; border: 2px solid #ddd; margin-bottom: 25px; box-sizing: border-box; }
         .form-add { background: #f1f3f5; padding: 20px; border-radius: 8px; margin-bottom: 30px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: end; }
-        .form-add h3 { grid-column: 1 / -1; margin: 0 0 5px 0; font-size: 16px; }
-        .input-group { display: flex; flex-direction: column; gap: 5px; }
-        input { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-
-        table { width: 100%; border-collapse: collapse; background: white; }
-        th { background-color: var(--dark); color: white; text-align: left; padding: 15px; font-size: 13px; text-transform: uppercase; }
-        td { padding: 15px; border-bottom: 1px solid #eee; vertical-align: middle; }
-        
+        table { width: 100%; border-collapse: collapse; }
+        th { background-color: var(--dark); color: white; padding: 15px; text-align: left; }
+        td { padding: 15px; border-bottom: 1px solid #eee; }
+        .thumb { width: 60px; height: 60px; background: #eee; border-radius: 6px; object-fit: cover; cursor: pointer; border: 1px solid #ddd; display: block; }
         .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .status-in { background: #d4edda; color: #155724; }
         .status-out { background: #fff3cd; color: #856404; }
-
-        .action-form { display: flex; gap: 5px; }
-        .btn-action { background: var(--success); color: white; padding: 8px 12px; border-radius: 4px; border: none; font-size: 12px; font-weight: bold; cursor: pointer; }
-        .btn-return { background: var(--danger); color: white; padding: 8px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; display: inline-block; }
-        
-        .info-small { font-size: 12px; color: #777; display: block; margin-top: 2px; }
-        .thumb { width: 50px; height: 50px; background: #eee; border-radius: 4px; object-fit: cover; border: 1px solid #ddd; }
+        .info-small { font-size: 12px; color: #777; display: block; }
     </style>
 </head>
 <body>
@@ -57,7 +33,7 @@
     <div class="header-area">
         <h1>📦 Skladová evidence</h1>
         <div class="nav-links">
-            <span style="font-size: 13px; font-weight: bold; margin-right: 10px;">👤 {{ prihlasen }}</span>
+            <span style="font-size: 13px; font-weight: bold;">👤 {{ prihlasen }}</span>
             <a href="/tisk" target="_blank" class="btn btn-print">🖨️ Štítky</a>
             <a href="/historie" class="btn btn-history">📜 Historie</a>
             <a href="/uzivatele" class="btn btn-users">👥 Uživatelé</a>
@@ -65,30 +41,26 @@
         </div>
     </div>
 
-    <div class="search-box">
-        <input type="text" id="hledat" placeholder="🔍 Začněte psát název věci, polohu nebo jméno pracovníka...">
-    </div>
+    <input type="text" id="hledat" placeholder="🔍 Rychlé hledání...">
 
     <form action="/pridat" method="POST" class="form-add">
-        <h3>➕ Přidat nový předmět</h3>
-        <div class="input-group">
-            <label class="info-small">Název předmětu</label>
-            <input type="text" name="nazev" placeholder="např. Motorová pila" required>
+        <div style="display:flex; flex-direction:column; gap:5px;">
+            <label class="info-small">Název</label>
+            <input type="text" name="nazev" required>
         </div>
-        <div class="input-group">
-            <label class="info-small">Místo uložení (domov)</label>
-            <input type="text" name="domov" placeholder="např. Regál C-12" required>
+        <div style="display:flex; flex-direction:column; gap:5px;">
+            <label class="info-small">Místo</label>
+            <input type="text" name="domov" required>
         </div>
-        <button type="submit" class="btn btn-history" style="height: 40px;">Uložit do skladu</button>
+        <button type="submit" class="btn btn-history" style="height:42px;">Uložit</button>
     </form>
 
     <table>
         <thead>
             <tr>
                 <th>Foto</th>
-                <th>Předmět / Umístění</th>
-                <th>Stav / Držitel</th>
-                <th>Poslední pohyb</th>
+                <th>Věc / Poloha</th>
+                <th>Stav / U koho</th>
                 <th>Poznámka</th>
                 <th>Akce</th>
             </tr>
@@ -98,39 +70,31 @@
             <tr>
                 <td>
                     {% if v.foto %}
-                        <img src="{{ v.foto }}" class="thumb">
+                        <img src="{{ v.foto }}" class="thumb" onclick="document.getElementById('file-{{v.id}}').click()">
                     {% else %}
-                        <div class="thumb" style="display: flex; align-items: center; justify-content: center; font-size: 20px;">📷</div>
+                        <div class="thumb" style="display:flex; align-items:center; justify-content:center; font-size:24px;" onclick="document.getElementById('file-{{v.id}}').click()">📷</div>
                     {% endif %}
+                    <input type="file" id="file-{{v.id}}" accept="image/*" capture="environment" style="display:none;" onchange="nahrajFoto(this, {{v.id}})">
                 </td>
-                <td>
-                    <strong>{{ v.nazev }}</strong>
-                    <span class="info-small">📍 Domov: {{ v.domov }}</span>
-                </td>
+                <td><strong>{{ v.nazev }}</strong><span class="info-small">📍 {{ v.domov }}</span></td>
                 <td>
                     {% if v.drzitel == 'Ve skladu' %}
                         <span class="status-badge status-in">VE SKLADU</span>
                     {% else %}
-                        <span class="status-badge status-out">U PRACOVNÍKA</span>
+                        <span class="status-badge status-out">PŮJČENO</span>
                         <span class="info-small">👤 {{ v.drzitel }}</span>
-                        <span class="info-small">📤 Vydal: {{ v.vydal }}</span>
                     {% endif %}
                 </td>
+                <td><small>{{ v.poznamka or '-' }}</small></td>
                 <td>
-                    <span class="info-small">{{ v.datum_posledni or 'Bez záznamu' }}</span>
-                </td>
-                <td>
-                    <span class="info-small" style="max-width: 150px; overflow: hidden;">{{ v.poznamka or '-' }}</span>
-                </td>
-                <td style="min-width: 250px;">
                     {% if v.drzitel == 'Ve skladu' %}
-                        <form action="/akce/{{ v.id }}" method="POST" class="action-form">
-                            <input type="text" name="drzitel" placeholder="Pracovník" required style="width: 100px;">
-                            <input type="text" name="poznamka" placeholder="Stav věci" style="width: 100px;">
-                            <button type="submit" class="btn-action">Půjčit</button>
-                        </form>
+                    <form action="/akce/{{ v.id }}" method="POST" style="display:flex; gap:5px;">
+                        <input type="text" name="drzitel" placeholder="Kdo?" required style="width:80px;">
+                        <input type="text" name="poznamka" placeholder="Stav" style="width:80px;">
+                        <button type="submit" class="btn" style="background:var(--success); color:white;">OK</button>
+                    </form>
                     {% else %}
-                        <a href="/vratit/{{ v.id }}" class="btn-return" onclick="return confirm('Potvrdit vrácení do skladu?')">📥 Vrátit do skladu</a>
+                        <a href="/vratit/{{ v.id }}" style="background:var(--danger); color:white; text-decoration:none; padding:8px 12px; border-radius:4px; font-size:12px;">📥 Vrátit</a>
                     {% endif %}
                 </td>
             </tr>
@@ -140,16 +104,38 @@
 </div>
 
 <script>
+    // Filtrace
     document.getElementById('hledat').addEventListener('keyup', function() {
-        let filter = this.value.toLowerCase();
-        let rows = document.querySelectorAll('tbody tr');
-        
-        rows.forEach(row => {
-            let text = row.innerText.toLowerCase();
-            row.style.display = text.includes(filter) ? '' : 'none';
+        let val = this.value.toLowerCase();
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.style.display = row.innerText.toLowerCase().includes(val) ? '' : 'none';
         });
     });
-</script>
 
+    // Focení a zmenšení
+    function nahrajFoto(input, id) {
+        if (input.files && input.files[0]) {
+            let reader = new FileReader();
+            reader.onload = function (e) {
+                let img = new Image();
+                img.onload = function() {
+                    let canvas = document.createElement('canvas');
+                    let scale = 400 / Math.max(img.width, img.height);
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    let base64 = canvas.toDataURL('image/jpeg', 0.7);
+                    
+                    let fd = new FormData();
+                    fd.append('foto', base64);
+                    fetch('/nahrat_foto/' + id, { method: 'POST', body: fd })
+                    .then(() => location.reload());
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+</script>
 </body>
 </html>
