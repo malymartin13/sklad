@@ -13,6 +13,7 @@ app.secret_key = 'tvoje_velmi_tajne_heslo_123'
 
 # --- KONFIGURACE DATABÁZE ---
 # Sem vlož svůj Connection String ze Supabase (URI)
+# Změna: uživatelské jméno je teď "postgres.rrwefiglecnruxwkzjqc"
 DB_URL = "postgresql://postgres.rrwefiglecnruxwkzjqc:databazesupabase@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require"
 
 def get_db_connection():
@@ -210,6 +211,7 @@ def tisk():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 
 
