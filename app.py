@@ -14,7 +14,6 @@ app.secret_key = os.environ.get('SECRET_KEY', 'sklad-2026-bezpecne-klic')
 
 # --- KONFIGURACE PŘIPOJENÍ ---
 def get_db_connection():
-    # Odolný způsob připojení pro Render + Supabase Pooler
     return psycopg2.connect(
         host="aws-0-eu-central-1.pooler.supabase.com",
         port="6543",
@@ -28,76 +27,52 @@ def get_db_connection():
     )
 
 def init_db():
-    print("--- START INICIALIZACE ---")
     conn = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+        cur.execute('CREATE TABLE IF NOT EXISTS uzivatele (id SERIAL PRIMARY KEY, jmeno TEXT UNIQUE, heslo TEXT)')
+        cur.execute('CREATE TABLE IF NOT EXISTS veci (id SERIAL PRIMARY KEY, nazev TEXT, domov TEXT, poloha TEXT, drzitel TEXT, datum_posledni TEXT, poznamka TEXT, vydal TEXT, foto TEXT)')
+        cur.execute('CREATE TABLE IF NOT EXISTS historie (id SERIAL PRIMARY KEY, vec_id INTEGER, akce TEXT, osoba TEXT, vydal TEXT, poznamka TEXT, cas TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
         
-        # Vytvoření tabulek (v PostgreSQL syntaxi)
-        cur.execute('''CREATE TABLE IF NOT EXISTS uzivatele 
-                        (id SERIAL PRIMARY KEY, jmeno TEXT UNIQUE, heslo TEXT)''')
-        cur.execute('''CREATE TABLE IF NOT EXISTS veci 
-                        (id SERIAL PRIMARY KEY, nazev TEXT, domov TEXT, poloha TEXT, 
-                         drzitel TEXT, datum_posledni TEXT, poznamka TEXT, vydal TEXT, foto TEXT)''')
-        cur.execute('''CREATE TABLE IF NOT EXISTS historie 
-                        (id SERIAL PRIMARY KEY, vec_id INTEGER, akce TEXT, osoba TEXT, 
-                         vydal TEXT, poznamka TEXT, cas TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-        
-        # Admin uživatel - kontrola existence
         cur.execute('SELECT 1 FROM uzivatele WHERE jmeno = %s', ('admin',))
         if not cur.fetchone():
             hashed_heslo = generate_password_hash('sklad2026')
             cur.execute('INSERT INTO uzivatele (jmeno, heslo) VALUES (%s, %s)', ('admin', hashed_heslo))
-            print("--- ADMIN VYTVOŘEN ---")
         
         conn.commit()
         cur.close()
-        print("--- DB PŘIPRAVENA ---")
     except Exception as e:
-        print(f"!!! CHYBA DB: {e}")
+        print(f"DB Error: {e}")
     finally:
-        if conn:
-            conn.close()
+        if conn: conn.close()
 
-# Inicializace proběhne při každém startu aplikace
 init_db()
 
-# --- DEKORÁTOR PRO PŘIHLÁŠENÍ ---
 def login_required(f):
     def wrap(*args, **kwargs):
-        if 'uzivatel' not in session:
-            return redirect(url_for('login'))
+        if 'uzivatel' not in session: return redirect(url_for('login'))
         return f(*args, **kwargs)
     wrap.__name__ = f.__name__
     return wrap
-
-# --- ROUTES ---
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         jmeno = request.form.get('jmeno')
         heslo = request.form.get('heslo')
-        
-        # Záchranná brzda - admin/sklad2026 pustí vždy
         if jmeno == 'admin' and heslo == 'sklad2026':
             session['uzivatel'] = 'admin'
             return redirect(url_for('index'))
-
-        # Standardní cesta přes DB
         conn = None
         try:
             conn = get_db_connection()
             cur = conn.cursor()
             cur.execute('SELECT * FROM uzivatele WHERE jmeno = %s', (jmeno,))
             user = cur.fetchone()
-            cur.close()
             if user and check_password_hash(user['heslo'], heslo):
                 session['uzivatel'] = user['jmeno']
                 return redirect(url_for('index'))
-        except Exception as e:
-            print(f"Login error: {e}")
         finally:
             if conn: conn.close()
         return "Chyba přihlášení!"
@@ -110,46 +85,34 @@ def index():
     cur = conn.cursor()
     cur.execute('SELECT * FROM veci ORDER BY id DESC')
     veci = cur.fetchall()
-    cur.close()
     conn.close()
     return render_template('index.html', veci=veci, prihlasen=session['uzivatel'])
 
 @app.route('/pridat', methods=['POST'])
 @login_required
 def pridat():
-    nazev = request.form.get('nazev')
-    domov = request.form.get('domov')
+    nazev, domov = request.form.get('nazev'), request.form.get('domov')
     if nazev:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute('INSERT INTO veci (nazev, domov, poloha, drzitel) VALUES (%s, %s, %s, %s)',
-                     (nazev, domov, domov, 'Ve skladu'))
+        cur.execute('INSERT INTO veci (nazev, domov, poloha, drzitel) VALUES (%s, %s, %s, %s)', (nazev, domov, domov, 'Ve skladu'))
         conn.commit()
-        cur.close()
         conn.close()
     return redirect(url_for('index'))
 
 @app.route('/akce/<int:id>', methods=['POST'])
 @login_required
 def akce(id):
-    drzitel = request.form.get('drzitel')
-    poznamka = request.form.get('poznamka', '')
-    vydal = session['uzivatel']
-    nyni = datetime.now().strftime("%d.%m.%Y %H:%M")
-    
+    drzitel, poznamka = request.form.get('drzitel'), request.form.get('poznamka', '')
+    vydal, nyni = session['uzivatel'], datetime.now().strftime("%d.%m.%Y %H:%M")
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('SELECT nazev FROM veci WHERE id = %s', (id,))
     vec = cur.fetchone()
     if vec:
-        cur.execute('''UPDATE veci SET drzitel = %s, poloha = 'U pracovníka', 
-                        datum_posledni = %s, poznamka = %s, vydal = %s WHERE id = %s''',
-                     (drzitel, nyni, poznamka, vydal, id))
-        cur.execute('''INSERT INTO historie (vec_id, akce, osoba, vydal, poznamka) 
-                        VALUES (%s, %s, %s, %s, %s)''',
-                     (id, f"Půjčeno: {vec['nazev']}", drzitel, vydal, poznamka))
+        cur.execute("UPDATE veci SET drzitel=%s, poloha='U pracovníka', datum_posledni=%s, poznamka=%s, vydal=%s WHERE id=%s", (drzitel, nyni, poznamka, vydal, id))
+        cur.execute("INSERT INTO historie (vec_id, akce, osoba, vydal, poznamka) VALUES (%s, %s, %s, %s, %s)", (id, f"Půjčeno: {vec['nazev']}", drzitel, vydal, poznamka))
         conn.commit()
-    cur.close()
     conn.close()
     return redirect(url_for('index'))
 
@@ -158,17 +121,13 @@ def akce(id):
 def vratit(id):
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT nazev, drzitel, domov FROM veci WHERE id = %s', (id,))
+    cur.execute('SELECT nazev, drzitel FROM veci WHERE id = %s', (id,))
     vec = cur.fetchone()
     if vec:
         nyni = datetime.now().strftime("%d.%m.%Y %H:%M")
-        cur.execute('''INSERT INTO historie (vec_id, akce, osoba, poznamka, vydal) 
-                        VALUES (%s, %s, %s, %s, %s)''',
-                     (id, f"Vráceno: {vec['nazev']}", f"od {vec['drzitel']}", "Zpět na sklad", session['uzivatel']))
-        cur.execute('''UPDATE veci SET drzitel = 'Ve skladu', poloha = domov, 
-                        vydal = '', datum_posledni = %s WHERE id = %s''', (nyni, id))
+        cur.execute("INSERT INTO historie (vec_id, akce, osoba, poznamka, vydal) VALUES (%s, %s, %s, %s, %s)", (id, f"Vráceno: {vec['nazev']}", f"od {vec['drzitel']}", "Zpět na sklad", session['uzivatel']))
+        cur.execute("UPDATE veci SET drzitel='Ve skladu', poloha=domov, vydal='', datum_posledni=%s WHERE id=%s", (nyni, id))
         conn.commit()
-    cur.close()
     conn.close()
     return redirect(url_for('index'))
 
@@ -178,10 +137,25 @@ def zobraz_historii():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('SELECT * FROM historie ORDER BY id DESC LIMIT 100')
-    zaznamy = cur.fetchall()
-    cur.close()
+    zaznamy = cur.fetchall() # TADY BYL TEN PŘEKLEP - TEĎ JE TO OK
     conn.close()
     return render_template('historie.html', zaznamy=zaznamy)
+
+@app.route('/uzivatele', methods=['GET', 'POST'])
+@login_required
+def uzivatele():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    if request.method == 'POST':
+        nove_jmeno, nove_heslo = request.form.get('jmeno'), generate_password_hash(request.form.get('heslo'))
+        try:
+            cur.execute('INSERT INTO uzivatele (jmeno, heslo) VALUES (%s, %s)', (nove_jmeno, nove_heslo))
+            conn.commit()
+        except: conn.rollback()
+    cur.execute('SELECT jmeno FROM uzivatele')
+    seznam = cur.fetchall()
+    conn.close()
+    return render_template('uzivatele.html', uzivatele=seznam)
 
 @app.route('/logout')
 def logout():
@@ -190,4 +164,3 @@ def logout():
 
 if __name__ == '__main__':
     app.run()
-
