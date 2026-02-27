@@ -1,4 +1,23 @@
 <!DOCTYPE html>
+<div style="margin: 20px 0;">
+    <input type="text" id="hledat" placeholder="🔍 Rychlé hledání věci..." style="width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #ddd;">
+</div>
+
+<script>
+    document.getElementById('hledat').addEventListener('keyup', function() {
+        let text = this.value.toLowerCase();
+        let radky = document.querySelectorAll('tbody tr');
+        
+        radky.forEach(radek => {
+            let nazev = radek.querySelector('td').innerText.toLowerCase();
+            if (nazev.includes(text)) {
+                radek.style.display = '';
+            } else {
+                radek.style.display = 'none';
+            }
+        });
+    });
+</script>
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -117,3 +136,4 @@
 
 </body>
 </html>
+
