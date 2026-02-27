@@ -1,23 +1,4 @@
 <!DOCTYPE html>
-<div style="margin: 20px 0;">
-    <input type="text" id="hledat" placeholder="🔍 Rychlé hledání věci..." style="width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #ddd;">
-</div>
-
-<script>
-    document.getElementById('hledat').addEventListener('keyup', function() {
-        let text = this.value.toLowerCase();
-        let radky = document.querySelectorAll('tbody tr');
-        
-        radky.forEach(radek => {
-            let nazev = radek.querySelector('td').innerText.toLowerCase();
-            if (nazev.includes(text)) {
-                radek.style.display = '';
-            } else {
-                radek.style.display = 'none';
-            }
-        });
-    });
-</script>
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -29,67 +10,85 @@
             --success: #28a745;
             --danger: #dc3545;
             --bg: #f8f9fa;
+            --dark: #343a40;
         }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: var(--bg); color: #333; }
-        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         
-        h1 { color: #222; margin-top: 0; display: flex; align-items: center; gap: 10px; }
+        .header-area { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+        h1 { margin: 0; font-size: 24px; }
         
-        .nav-links { margin-bottom: 25px; display: flex; gap: 10px; }
-        .btn { padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: 600; cursor: pointer; border: none; font-size: 14px; transition: 0.2s; }
+        .nav-links { display: flex; gap: 10px; align-items: center; }
+        .btn { padding: 10px 15px; border-radius: 6px; text-decoration: none; font-weight: 600; cursor: pointer; border: none; font-size: 13px; transition: 0.2s; display: inline-flex; align-items: center; gap: 5px; }
         .btn-print { background-color: var(--success); color: white; }
         .btn-history { background-color: var(--primary); color: white; }
+        .btn-users { background-color: #6c757d; color: white; }
+        .btn-logout { background-color: transparent; color: var(--danger); border: 1px solid var(--danger); }
         .btn:hover { opacity: 0.85; transform: translateY(-1px); }
 
-        .form-add { background: #eee; padding: 20px; border-radius: 8px; margin-bottom: 30px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
-        .form-add h3 { grid-column: 1 / -1; margin: 0 0 10px 0; font-size: 16px; }
+        .search-box { margin-bottom: 25px; }
+        #hledat { width: 100%; padding: 15px; font-size: 16px; border-radius: 8px; border: 2px solid #ddd; box-sizing: border-box; outline: none; transition: border-color 0.2s; }
+        #hledat:focus { border-color: var(--primary); }
+
+        .form-add { background: #f1f3f5; padding: 20px; border-radius: 8px; margin-bottom: 30px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: end; }
+        .form-add h3 { grid-column: 1 / -1; margin: 0 0 5px 0; font-size: 16px; }
+        .input-group { display: flex; flex-direction: column; gap: 5px; }
         input { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { background-color: #f2f2f2; text-align: left; padding: 15px; border-bottom: 2px solid #ddd; color: #555; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th { background-color: var(--dark); color: white; text-align: left; padding: 15px; font-size: 13px; text-transform: uppercase; }
         td { padding: 15px; border-bottom: 1px solid #eee; vertical-align: middle; }
         
-        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .status-in { background: #d4edda; color: #155724; }
         .status-out { background: #fff3cd; color: #856404; }
 
-        .action-cell { min-width: 280px; }
         .action-form { display: flex; gap: 5px; }
-        .btn-action { background: var(--success); color: white; padding: 6px 12px; border-radius: 4px; border: none; font-size: 12px; }
-        .btn-return { background: var(--danger); color: white; padding: 8px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-block; }
+        .btn-action { background: var(--success); color: white; padding: 8px 12px; border-radius: 4px; border: none; font-size: 12px; font-weight: bold; cursor: pointer; }
+        .btn-return { background: var(--danger); color: white; padding: 8px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; display: inline-block; }
         
-        .info-small { font-size: 12px; color: #777; display: block; margin-top: 4px; }
+        .info-small { font-size: 12px; color: #777; display: block; margin-top: 2px; }
+        .thumb { width: 50px; height: 50px; background: #eee; border-radius: 4px; object-fit: cover; border: 1px solid #ddd; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>📦 Správa skladu</h1>
+    <div class="header-area">
+        <h1>📦 Skladová evidence</h1>
+        <div class="nav-links">
+            <span style="font-size: 13px; font-weight: bold; margin-right: 10px;">👤 {{ prihlasen }}</span>
+            <a href="/tisk" target="_blank" class="btn btn-print">🖨️ Štítky</a>
+            <a href="/historie" class="btn btn-history">📜 Historie</a>
+            <a href="/uzivatele" class="btn btn-users">👥 Uživatelé</a>
+            <a href="/logout" class="btn btn-logout">Odhlásit</a>
+        </div>
+    </div>
 
-    <div class="nav-links">
-        <a href="/tisk" target="_blank" class="btn btn-print">🖨️ Tisk štítků (PDF)</a>
-        <a href="/historie" class="btn btn-history">📜 Historie pohybů</a>
+    <div class="search-box">
+        <input type="text" id="hledat" placeholder="🔍 Začněte psát název věci, polohu nebo jméno pracovníka...">
     </div>
 
     <form action="/pridat" method="POST" class="form-add">
-        <h3>➕ Nový předmět do evidence</h3>
-        <div>
-            <label class="info-small">Název věci</label>
-            <input type="text" name="nazev" placeholder="např. Úhlová bruska" required style="width: 100%;">
+        <h3>➕ Přidat nový předmět</h3>
+        <div class="input-group">
+            <label class="info-small">Název předmětu</label>
+            <input type="text" name="nazev" placeholder="např. Motorová pila" required>
         </div>
-        <div>
-            <label class="info-small">Stálé umístění</label>
-            <input type="text" name="domov" placeholder="např. Regál B5" required style="width: 100%;">
+        <div class="input-group">
+            <label class="info-small">Místo uložení (domov)</label>
+            <input type="text" name="domov" placeholder="např. Regál C-12" required>
         </div>
-        <button type="submit" class="btn btn-history">Uložit</button>
+        <button type="submit" class="btn btn-history" style="height: 40px;">Uložit do skladu</button>
     </form>
 
     <table>
         <thead>
             <tr>
-                <th>Předmět a poloha</th>
-                <th>Stav / U koho je</th>
-                <th>Poslední změna</th>
+                <th>Foto</th>
+                <th>Předmět / Umístění</th>
+                <th>Stav / Držitel</th>
+                <th>Poslední pohyb</th>
                 <th>Poznámka</th>
                 <th>Akce</th>
             </tr>
@@ -98,34 +97,40 @@
             {% for v in veci %}
             <tr>
                 <td>
+                    {% if v.foto %}
+                        <img src="{{ v.foto }}" class="thumb">
+                    {% else %}
+                        <div class="thumb" style="display: flex; align-items: center; justify-content: center; font-size: 20px;">📷</div>
+                    {% endif %}
+                </td>
+                <td>
                     <strong>{{ v.nazev }}</strong>
-                    <span class="info-small">Domov: {{ v.domov }}</span>
+                    <span class="info-small">📍 Domov: {{ v.domov }}</span>
                 </td>
                 <td>
                     {% if v.drzitel == 'Ve skladu' %}
                         <span class="status-badge status-in">VE SKLADU</span>
                     {% else %}
-                        <span class="status-badge status-out">PŮJČENO</span>
-                        <span class="info-small">Držitel: {{ v.drzitel }}</span>
-                        <span class="info-small">Vydal: {{ v.vydal or '?' }}</span>
+                        <span class="status-badge status-out">U PRACOVNÍKA</span>
+                        <span class="info-small">👤 {{ v.drzitel }}</span>
+                        <span class="info-small">📤 Vydal: {{ v.vydal }}</span>
                     {% endif %}
                 </td>
                 <td>
-                    <span class="info-small">{{ v.datum_posledni or 'Není záznam' }}</span>
+                    <span class="info-small">{{ v.datum_posledni or 'Bez záznamu' }}</span>
                 </td>
                 <td>
-                    <span class="info-small">{{ v.poznamka or '-' }}</span>
+                    <span class="info-small" style="max-width: 150px; overflow: hidden;">{{ v.poznamka or '-' }}</span>
                 </td>
-                <td class="action-cell">
+                <td style="min-width: 250px;">
                     {% if v.drzitel == 'Ve skladu' %}
                         <form action="/akce/{{ v.id }}" method="POST" class="action-form">
-                            <input type="text" name="drzitel" placeholder="Pracovník" required style="width: 80px;">
-                            <input type="text" name="vydal" placeholder="Skladník" style="width: 80px;">
-                            <input type="text" name="poznamka" placeholder="Poznámka" style="width: 80px;">
+                            <input type="text" name="drzitel" placeholder="Pracovník" required style="width: 100px;">
+                            <input type="text" name="poznamka" placeholder="Stav věci" style="width: 100px;">
                             <button type="submit" class="btn-action">Půjčit</button>
                         </form>
                     {% else %}
-                        <a href="/vratit/{{ v.id }}" class="btn-return" onclick="return confirm('Opravdu vráceno do skladu?')">📥 Vrátit do skladu</a>
+                        <a href="/vratit/{{ v.id }}" class="btn-return" onclick="return confirm('Potvrdit vrácení do skladu?')">📥 Vrátit do skladu</a>
                     {% endif %}
                 </td>
             </tr>
@@ -134,6 +139,17 @@
     </table>
 </div>
 
+<script>
+    document.getElementById('hledat').addEventListener('keyup', function() {
+        let filter = this.value.toLowerCase();
+        let rows = document.querySelectorAll('tbody tr');
+        
+        rows.forEach(row => {
+            let text = row.innerText.toLowerCase();
+            row.style.display = text.includes(filter) ? '' : 'none';
+        });
+    });
+</script>
+
 </body>
 </html>
-
