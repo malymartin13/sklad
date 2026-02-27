@@ -8,46 +8,14 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = 'tvoje_velmi_tajne_heslo_123' # Nutné pro přihlašování
+app.secret_key = 'tvoje_velmi_tajne_heslo_123'
 
 def get_db_connection():
-    # Přejdeme na sklad_v3, abychom měli čistý start s uživateli
     conn = sqlite3.connect('sklad_v3.db')
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_db():
-    conn = get_db_connection()
-    # Tabulka uživatelů
-    conn.execute('''CREATE TABLE IF NOT EXISTS uzivatele 
-                    (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                     jmeno TEXT UNIQUE, heslo TEXT)''')
-    
-    # Tabulka věcí (přidán sloupec foto)
-    conn.execute('''CREATE TABLE IF NOT EXISTS veci 
-                    (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                     nazev TEXT, domov TEXT, poloha TEXT, drzitel TEXT,
-                     datum_posledni TEXT, poznamka TEXT, vydal TEXT, foto TEXT)''')
-    
-    conn.execute('''CREATE TABLE IF NOT EXISTS historie 
-                    (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                     vec_id INTEGER, akce TEXT, osoba TEXT, 
-                     vydal TEXT, poznamka TEXT,
-                     cas TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-
-    # Vytvoření prvního administrátora (pokud neexistuje)
-    # Jméno: admin, Heslo: sklad2026
-    hashed_heslo = generate_password_hash('sklad2026')
-    try:
-        conn.execute('INSERT INTO uzivatele (jmeno, heslo) VALUES (?, ?)', ('admin', hashed_heslo))
-    except: pass
-    
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# --- ZABEZPEČENÍ (DEKORÁTOR) ---
+# --- ZABEZPEČENÍ ---
 def vyzaduje_prihlaseni(f):
     def wrap(*args, **kwargs):
         if 'uzivatel' not in session:
@@ -55,8 +23,6 @@ def vyzaduje_prihlaseni(f):
         return f(*args, **kwargs)
     wrap.__name__ = f.__name__
     return wrap
-
-# --- CESTY ---
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -66,7 +32,6 @@ def login():
         conn = get_db_connection()
         user = conn.execute('SELECT * FROM uzivatele WHERE jmeno = ?', (jmeno,)).fetchone()
         conn.close()
-        
         if user and check_password_hash(user['heslo'], heslo):
             session['uzivatel'] = user['jmeno']
             return redirect(url_for('index'))
@@ -77,6 +42,24 @@ def login():
 def logout():
     session.pop('uzivatel', None)
     return redirect(url_for('login'))
+
+# --- NOVINKA: SPRÁVA UŽIVATELŮ ---
+@app.route('/uzivatele', methods=['GET', 'POST'])
+@vyzaduje_prihlaseni
+def uzivatele():
+    conn = get_db_connection()
+    if request.method == 'POST':
+        nove_jmeno = request.form['jmeno']
+        nove_heslo = generate_password_hash(request.form['heslo'])
+        try:
+            conn.execute('INSERT INTO uzivatele (jmeno, heslo) VALUES (?, ?)', (nove_jmeno, nove_heslo))
+            conn.commit()
+        except:
+            return "Uživatel již existuje!"
+    
+    seznam = conn.execute('SELECT jmeno FROM uzivatele').fetchall()
+    conn.close()
+    return render_template('uzivatele.html', uzivatele=seznam)
 
 @app.route('/')
 @vyzaduje_prihlaseni
@@ -91,23 +74,37 @@ def index():
 def akce(id):
     drzitel = request.form.get('drzitel')
     poznamka = request.form.get('poznamka')
-    vydal = session['uzivatel'] # Skladník se vyplní automaticky z přihlášení!
+    vydal = session['uzivatel'] # Bere se automaticky z přihlášení
     nyni = datetime.now().strftime("%d.%m.%Y %H:%M")
     
     conn = get_db_connection()
     vec = conn.execute('SELECT nazev FROM veci WHERE id = ?', (id,)).fetchone()
     
-    if drzitel and drzitel.strip(): 
-        conn.execute('''UPDATE veci SET drzitel = ?, poloha = ?, 
-                        datum_posledni = ?, poznamka = ?, vydal = ? WHERE id = ?''',
-                     (drzitel, 'U pracovníka', nyni, poznamka, vydal, id))
-        conn.execute('''INSERT INTO historie (vec_id, akce, osoba, vydal, poznamka) 
-                        VALUES (?, ?, ?, ?, ?)''',
-                     (id, f"Půjčeno: {vec['nazev']}", drzitel, vydal, poznamka))
-    
+    conn.execute('''UPDATE veci SET drzitel = ?, poloha = ?, 
+                    datum_posledni = ?, poznamka = ?, vydal = ? WHERE id = ?''',
+                 (drzitel, 'U pracovníka', nyni, poznamka, vydal, id))
+    conn.execute('''INSERT INTO historie (vec_id, akce, osoba, vydal, poznamka) 
+                    VALUES (?, ?, ?, ?, ?)''',
+                 (id, f"Půjčeno: {vec['nazev']}", drzitel, vydal, poznamka))
     conn.commit()
     conn.close()
     return redirect('/')
+
+# ... (ostatní trasy /vratit, /historie, /tisk zůstávají stejné jako v minulé verzi) ...
+# POUZE PŘIDEJ init_db() volání na konec nebo pod definice
+def init_db():
+    conn = get_db_connection()
+    conn.execute('CREATE TABLE IF NOT EXISTS uzivatele (id INTEGER PRIMARY KEY AUTOINCREMENT, jmeno TEXT UNIQUE, heslo TEXT)')
+    conn.execute('CREATE TABLE IF NOT EXISTS veci (id INTEGER PRIMARY KEY AUTOINCREMENT, nazev TEXT, domov TEXT, poloha TEXT, drzitel TEXT, datum_posledni TEXT, poznamka TEXT, vydal TEXT, foto TEXT)')
+    conn.execute('CREATE TABLE IF NOT EXISTS historie (id INTEGER PRIMARY KEY AUTOINCREMENT, vec_id INTEGER, akce TEXT, osoba TEXT, vydal TEXT, poznamka TEXT, cas TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
+    # Výchozí admin
+    hashed = generate_password_hash('sklad2026')
+    try: conn.execute('INSERT INTO uzivatele (jmeno, heslo) VALUES (?, ?)', ('admin', hashed))
+    except: pass
+    conn.commit()
+    conn.close()
+
+init_db()
 
 @app.route('/vratit/<int:id>')
 @vyzaduje_prihlaseni
@@ -125,7 +122,6 @@ def vratit(id):
     conn.close()
     return redirect('/')
 
-# ... (ostatní trasy jako /historie, /tisk a /pridat také obal @vyzaduje_prihlaseni) ...
 @app.route('/historie')
 @vyzaduje_prihlaseni
 def zobraz_historii():
