@@ -178,7 +178,7 @@ def zobraz_historii():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('SELECT * FROM historie ORDER BY id DESC LIMIT 100')
-    z zaznamy = cur.fetchall()
+    zaznamy = cur.fetchall()
     cur.close()
     conn.close()
     return render_template('historie.html', zaznamy=zaznamy)
@@ -190,3 +190,4 @@ def logout():
 
 if __name__ == '__main__':
     app.run()
+
