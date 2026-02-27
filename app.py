@@ -10,11 +10,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import os
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'sklad-tajne-heslo-2026')
+app.secret_key = os.environ.get('SECRET_KEY', 'sklad-2026-bezpecne-klic')
 
 # --- KONFIGURACE PŘIPOJENÍ ---
 def get_db_connection():
-    # Používáme oddělené parametry pro maximální stabilitu na Renderu
+    # Odolný způsob připojení pro Render + Supabase Pooler
     return psycopg2.connect(
         host="aws-0-eu-central-1.pooler.supabase.com",
         port="6543",
@@ -24,17 +24,17 @@ def get_db_connection():
         sslmode="require",
         options="-c project=rrwefiglecnruxwkzjqc",
         cursor_factory=RealDictCursor,
-        connect_timeout=10
+        connect_timeout=15
     )
 
 def init_db():
-    print("--- Inicializace databáze v Supabase ---")
+    print("--- START INICIALIZACE ---")
     conn = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Tabulky (PostgreSQL syntaxe)
+        # Vytvoření tabulek (v PostgreSQL syntaxi)
         cur.execute('''CREATE TABLE IF NOT EXISTS uzivatele 
                         (id SERIAL PRIMARY KEY, jmeno TEXT UNIQUE, heslo TEXT)''')
         cur.execute('''CREATE TABLE IF NOT EXISTS veci 
@@ -44,26 +44,27 @@ def init_db():
                         (id SERIAL PRIMARY KEY, vec_id INTEGER, akce TEXT, osoba TEXT, 
                          vydal TEXT, poznamka TEXT, cas TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
         
-        # Vytvoření admina pokud neexistuje
-        hashed_heslo = generate_password_hash('sklad2026')
-        cur.execute('''INSERT INTO uzivatele (jmeno, heslo) 
-                       SELECT %s, %s WHERE NOT EXISTS (SELECT 1 FROM uzivatele WHERE jmeno = %s)''', 
-                    ('admin', hashed_heslo, 'admin'))
+        # Admin uživatel - kontrola existence
+        cur.execute('SELECT 1 FROM uzivatele WHERE jmeno = %s', ('admin',))
+        if not cur.fetchone():
+            hashed_heslo = generate_password_hash('sklad2026')
+            cur.execute('INSERT INTO uzivatele (jmeno, heslo) VALUES (%s, %s)', ('admin', hashed_heslo))
+            print("--- ADMIN VYTVOŘEN ---")
         
         conn.commit()
         cur.close()
-        print("--- Databáze je připravena ---")
+        print("--- DB PŘIPRAVENA ---")
     except Exception as e:
-        print(f"!!! CHYBA INICIALIZACE: {e}")
+        print(f"!!! CHYBA DB: {e}")
     finally:
         if conn:
             conn.close()
 
-# Spustit inicializaci při startu
+# Inicializace proběhne při každém startu aplikace
 init_db()
 
-# --- ZABEZPEČENÍ ---
-def vyzaduje_prihlaseni(f):
+# --- DEKORÁTOR PRO PŘIHLÁŠENÍ ---
+def login_required(f):
     def wrap(*args, **kwargs):
         if 'uzivatel' not in session:
             return redirect(url_for('login'))
@@ -71,20 +72,20 @@ def vyzaduje_prihlaseni(f):
     wrap.__name__ = f.__name__
     return wrap
 
-# --- CESTY ---
+# --- ROUTES ---
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        jmeno = request.form['jmeno']
-        heslo = request.form['heslo']
+        jmeno = request.form.get('jmeno')
+        heslo = request.form.get('heslo')
         
-        # DOČASNÝ ZÁCHRANNÝ PŘÍSTUP:
+        # Záchranná brzda - admin/sklad2026 pustí vždy
         if jmeno == 'admin' and heslo == 'sklad2026':
             session['uzivatel'] = 'admin'
             return redirect(url_for('index'))
-            
-        # Standardní ověření (pokud by záchrana neprošla)
+
+        # Standardní cesta přes DB
         conn = None
         try:
             conn = get_db_connection()
@@ -96,19 +97,14 @@ def login():
                 session['uzivatel'] = user['jmeno']
                 return redirect(url_for('index'))
         except Exception as e:
-            print(f"Chyba login: {e}")
+            print(f"Login error: {e}")
         finally:
             if conn: conn.close()
-        return "Špatné jméno nebo heslo!"
+        return "Chyba přihlášení!"
     return render_template('login.html')
 
-@app.route('/logout')
-def logout():
-    session.pop('uzivatel', None)
-    return redirect(url_for('login'))
-
 @app.route('/')
-@vyzaduje_prihlaseni
+@login_required
 def index():
     conn = get_db_connection()
     cur = conn.cursor()
@@ -118,68 +114,51 @@ def index():
     conn.close()
     return render_template('index.html', veci=veci, prihlasen=session['uzivatel'])
 
-@app.route('/uzivatele', methods=['GET', 'POST'])
-@vyzaduje_prihlaseni
-def uzivatele():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    if request.method == 'POST':
-        nove_jmeno = request.form['jmeno']
-        nove_heslo = generate_password_hash(request.form['heslo'])
-        try:
-            cur.execute('INSERT INTO uzivatele (jmeno, heslo) VALUES (%s, %s)', (nove_jmeno, nove_heslo))
-            conn.commit()
-        except:
-            conn.rollback()
-    cur.execute('SELECT jmeno FROM uzivatele')
-    seznam = cur.fetchall()
-    cur.close()
-    conn.close()
-    return render_template('uzivatele.html', uzivatele=seznam)
-
-@app.route('/pridat', methods=('POST',))
-@vyzaduje_prihlaseni
+@app.route('/pridat', methods=['POST'])
+@login_required
 def pridat():
-    nazev = request.form['nazev']
-    domov = request.form['domov']
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('INSERT INTO veci (nazev, domov, poloha, drzitel) VALUES (%s, %s, %s, %s)',
-                 (nazev, domov, domov, 'Ve skladu'))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return redirect('/')
+    nazev = request.form.get('nazev')
+    domov = request.form.get('domov')
+    if nazev:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('INSERT INTO veci (nazev, domov, poloha, drzitel) VALUES (%s, %s, %s, %s)',
+                     (nazev, domov, domov, 'Ve skladu'))
+        conn.commit()
+        cur.close()
+        conn.close()
+    return redirect(url_for('index'))
 
-@app.route('/akce/<int:id>', methods=('POST',))
-@vyzaduje_prihlaseni
+@app.route('/akce/<int:id>', methods=['POST'])
+@login_required
 def akce(id):
     drzitel = request.form.get('drzitel')
-    poznamka = request.form.get('poznamka')
+    poznamka = request.form.get('poznamka', '')
     vydal = session['uzivatel']
     nyni = datetime.now().strftime("%d.%m.%Y %H:%M")
+    
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('SELECT nazev FROM veci WHERE id = %s', (id,))
     vec = cur.fetchone()
     if vec:
-        cur.execute('''UPDATE veci SET drzitel = %s, poloha = %s, 
+        cur.execute('''UPDATE veci SET drzitel = %s, poloha = 'U pracovníka', 
                         datum_posledni = %s, poznamka = %s, vydal = %s WHERE id = %s''',
-                     (drzitel, 'U pracovníka', nyni, poznamka, vydal, id))
+                     (drzitel, nyni, poznamka, vydal, id))
         cur.execute('''INSERT INTO historie (vec_id, akce, osoba, vydal, poznamka) 
                         VALUES (%s, %s, %s, %s, %s)''',
                      (id, f"Půjčeno: {vec['nazev']}", drzitel, vydal, poznamka))
         conn.commit()
     cur.close()
     conn.close()
-    return redirect('/')
+    return redirect(url_for('index'))
 
 @app.route('/vratit/<int:id>')
-@vyzaduje_prihlaseni
+@login_required
 def vratit(id):
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT nazev, drzitel FROM veci WHERE id = %s', (id,))
+    cur.execute('SELECT nazev, drzitel, domov FROM veci WHERE id = %s', (id,))
     vec = cur.fetchone()
     if vec:
         nyni = datetime.now().strftime("%d.%m.%Y %H:%M")
@@ -191,56 +170,23 @@ def vratit(id):
         conn.commit()
     cur.close()
     conn.close()
-    return redirect('/')
+    return redirect(url_for('index'))
 
 @app.route('/historie')
-@vyzaduje_prihlaseni
+@login_required
 def zobraz_historii():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('SELECT * FROM historie ORDER BY id DESC LIMIT 100')
-    zaznamy = cur.fetchall()
+    z zaznamy = cur.fetchall()
     cur.close()
     conn.close()
     return render_template('historie.html', zaznamy=zaznamy)
 
-@app.route('/nahrat_foto/<int:id>', methods=['POST'])
-@vyzaduje_prihlaseni
-def nahrat_foto(id):
-    foto_data = request.form.get('foto')
-    if foto_data:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute('UPDATE veci SET foto = %s WHERE id = %s', (foto_data, id))
-        conn.commit()
-        cur.close()
-        conn.close()
-    return "OK", 200
-
-@app.route('/tisk')
-@vyzaduje_prihlaseni
-def tisk():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('SELECT * FROM veci')
-    veci = cur.fetchall()
-    cur.close()
-    conn.close()
-    veci_s_qr = []
-    # Pozor: Zde by měla být tvá reálná URL adresa z Renderu
-    base_url = request.host_url.rstrip('/')
-    for vec in veci:
-        qr_data = f"{base_url}/akce_mobil/{vec['id']}"
-        qr = qrcode.make(qr_data)
-        img_buffer = io.BytesIO()
-        qr.save(img_buffer, format='PNG')
-        img_str = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
-        veci_s_qr.append({'nazev': vec['nazev'], 'id': vec['id'], 'domov': vec['domov'], 'qr': img_str})
-    html_content = render_template('stitky.html', veci=veci_s_qr)
-    pdf = HTML(string=html_content).write_pdf()
-    return pdf, 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename=stitky.pdf'}
+@app.route('/logout')
+def logout():
+    session.pop('uzivatel', None)
+    return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    # Lokální spuštění (na Renderu běží přes gunicorn)
-    app.run(debug=True)
-
+    app.run()
