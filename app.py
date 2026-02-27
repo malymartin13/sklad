@@ -78,6 +78,13 @@ def login():
     if request.method == 'POST':
         jmeno = request.form['jmeno']
         heslo = request.form['heslo']
+        
+        # DOČASNÝ ZÁCHRANNÝ PŘÍSTUP:
+        if jmeno == 'admin' and heslo == 'sklad2026':
+            session['uzivatel'] = 'admin'
+            return redirect(url_for('index'))
+            
+        # Standardní ověření (pokud by záchrana neprošla)
         conn = None
         try:
             conn = get_db_connection()
@@ -236,3 +243,4 @@ def tisk():
 if __name__ == '__main__':
     # Lokální spuštění (na Renderu běží přes gunicorn)
     app.run(debug=True)
+
