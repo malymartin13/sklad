@@ -3,3 +3,4 @@ gunicorn
 qrcode[pil]
 Pillow
 weasyprint
+psycopg2-binary
