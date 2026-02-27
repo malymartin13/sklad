@@ -13,7 +13,7 @@ app.secret_key = 'tvoje_velmi_tajne_heslo_123'
 
 # --- KONFIGURACE DATABÁZE ---
 # Sem vlož svůj Connection String ze Supabase (URI)
-DB_URL = "postgresql://postgres:databazesupabase@db.rrwefiglecnruxwkzjqc.supabase.co:5432/postgres?sslmode=require"
+DB_URL = "postgresql://postgres.rrwefiglecnruxwkzjqc:databazesupabase@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require"
 
 def get_db_connection():
     conn = psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
@@ -210,6 +210,7 @@ def tisk():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 
 
