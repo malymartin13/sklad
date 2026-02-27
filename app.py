@@ -14,15 +14,14 @@ app.secret_key = os.environ.get('SECRET_KEY', 'sklad-2026-unikatni-klic')
 
 # --- KONFIGURACE PŘIPOJENÍ ---
 def get_db_connection():
-    # Připojení přes Supabase Pooler (IPv4 kompatibilní)
+    # ID projektu dáváme přímo do uživatele - to Supabase Pooler pochopí vždy
     return psycopg2.connect(
         host="aws-0-eu-central-1.pooler.supabase.com",
         port="6543",
         database="postgres",
-        user="postgres.rrwefiglecnruxwkzjqc",
+        user="postgres.rrwefiglecnruxwkzjqc", # Formát: postgres.VASE_ID_PROJEKTU
         password="databazesupabase",
         sslmode="require",
-        options="-c project=rrwefiglecnruxwkzjqc",
         cursor_factory=RealDictCursor,
         connect_timeout=15
     )
@@ -199,3 +198,4 @@ def logout():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
